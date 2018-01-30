@@ -1,3 +1,4 @@
+# Ignore files
 *.d
 *.tab.c
 *.tab.h
@@ -5,3 +6,7 @@
 *.asm
 *.cfg
 *.out
+*.o
+
+# Ignore folders
+bin
