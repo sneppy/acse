@@ -92,7 +92,7 @@ t_io_infos *file_infos;    /* input and output files used by the compiler */
 
 %}
 
-%expect 1
+%expect 2
 
 /*=========================================================================
                           SEMANTIC RECORDS
@@ -125,7 +125,7 @@ t_io_infos *file_infos;    /* input and output files used by the compiler */
 
 %token <label> DO
 %token <while_stmt> WHILE
-%token <label> IF
+%token <label> IF IIF
 %token <label> ELSE
 %token <intval> TYPE
 %token <svalue> IDENTIFIER
@@ -135,6 +135,7 @@ t_io_infos *file_infos;    /* input and output files used by the compiler */
 %type <decl> declaration
 %type <list> declaration_list
 %type <label> if_stmt
+%type <label> iif_stmt
 
 /*=========================================================================
                           OPERATOR PRECEDENCES
@@ -248,6 +249,7 @@ statement   : assign_statement SEMI      { /* does nothing */ }
 ;
 
 control_statement : if_statement         { /* does nothing */ }
+			| iif_statement				 {					  }
             | while_statement            { /* does nothing */ }
             | do_while_statement SEMI    { /* does nothing */ }
             | return_statement SEMI      { /* does nothing */ }
@@ -348,6 +350,44 @@ if_stmt  :  IF
                      gen_beq_instruction (program, $1, 0);
                }
                code_block { $$ = $1; }
+;
+
+iif_statement : iif_stmt
+               {
+                  assignLabel(program, $1);
+               }
+               | iif_stmt ELSE
+               {
+                  /* reserve a new label that points to the address where to jump if
+                   * `exp' is verified */
+                  $2 = newLabel(program);
+   
+                  /* exit from the if-else */
+                  gen_bt_instruction (program, $2, 0);
+   
+                  /* fix the `label_else' */
+                  assignLabel(program, $1);
+               }
+               code_block
+               {
+                  /* fix the `label_else' */
+                  assignLabel(program, $2);
+               }
+;
+               
+
+iif_stmt :  IIF LPAR assign_statement SEMI exp RPAR
+			{
+				if ($5.expression_type == IMMEDIATE)
+					gen_load_immediate(program, $5.value);
+				else
+					gen_andb_instruction(program, $5.value,
+                        $5.value, $5.value, CG_DIRECT_ALL);
+                
+                $1 = newLabel(program);
+                gen_beq_instruction(program, $1, 0);
+			}
+			code_block { $$ = $1; }
 ;
 
 while_statement  : WHILE
