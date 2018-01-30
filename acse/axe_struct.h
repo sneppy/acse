@@ -114,6 +114,13 @@ typedef struct t_while_statement
                                     * that follows the while construct */
 } t_while_statement;
 
+typedef struct t_eval_statement
+{
+	t_axe_label *code_label; // Points to the code block of the eval structure
+	t_axe_label *expr_label; // Points to the expression check block
+	t_axe_label *end_label; // Points to the end of the eval structure
+} t_eval_statement;
+
 /* create a label */
 extern t_axe_label * alloc_label(int value);
 
@@ -122,6 +129,9 @@ extern t_axe_expression create_expression (int value, int type);
 
 /* create an instance that will mantain infos about a while statement */
 extern t_while_statement create_while_statement();
+
+/* Create an instance that will mantain infos avout an eval statement */
+extern t_eval_statement create_eval_statement(t_axe_label*, t_axe_label*, t_axe_label*);
 
 /* create an instance of `t_axe_register' */
 extern t_axe_register * alloc_register(int ID, int indirect);

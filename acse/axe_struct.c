@@ -100,6 +100,19 @@ t_while_statement create_while_statement()
    return statement;
 }
 
+/* Create an instance that will mantain infos avout an eval statement */
+t_eval_statement create_eval_statement(t_axe_label* code_label, t_axe_label* expr_label, t_axe_label* end_label)
+{
+	t_eval_statement eval_statement;
+
+	// init
+	eval_statement.code_label = code_label;
+	eval_statement.expr_label = expr_label;
+	eval_statement.end_label = end_label;
+
+	return eval_statement;
+}
+
 t_axe_label * alloc_label(int value)
 {
    t_axe_label *result;

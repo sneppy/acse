@@ -106,6 +106,7 @@ t_io_infos *file_infos;    /* input and output files used by the compiler */
    t_list *list;
    t_axe_label *label;
    t_while_statement while_stmt;
+   t_eval_statement eval_stmt;
 } 
 /*=========================================================================
                                TOKENS 
@@ -122,6 +123,7 @@ t_io_infos *file_infos;    /* input and output files used by the compiler */
 %token RETURN
 %token READ
 %token WRITE
+%token UNLESS
 
 %token <label> DO
 %token <while_stmt> WHILE
@@ -130,6 +132,7 @@ t_io_infos *file_infos;    /* input and output files used by the compiler */
 %token <intval> TYPE
 %token <svalue> IDENTIFIER
 %token <intval> NUMBER
+%token <eval_stmt> EVAL
 
 %type <expr> exp
 %type <decl> declaration
@@ -250,6 +253,7 @@ statement   : assign_statement SEMI      { /* does nothing */ }
 control_statement : if_statement         { /* does nothing */ }
             | while_statement            { /* does nothing */ }
             | do_while_statement SEMI    { /* does nothing */ }
+			| eval_statement SEMI		 { /* does nothing */ }
             | return_statement SEMI      { /* does nothing */ }
 ;
 
@@ -406,6 +410,49 @@ do_while_statement  : DO
                            /* if `exp' returns TRUE, jump to the label $1 */
                            gen_bne_instruction (program, $1, 0);
                      }
+;
+
+eval_statement: EVAL
+				{
+					// Create labels
+					$1 = create_eval_statement(
+						newLabel(program),
+						newLabel(program),
+						newLabel(program)
+					);
+
+					// Jump to expression check
+					gen_bt_instruction(program, $1.expr_label, 0);
+
+					// Code label
+					assignLabel(program, $1.code_label);
+				}
+				code_block
+				{
+					// Jump to the end
+					gen_bt_instruction(program, $1.end_label, 0);
+				}
+				UNLESS
+				{
+					// Expression check label
+					assignLabel(program, $1.expr_label);
+				}
+				exp
+				{
+					int expr_reg = getNewRegister(program);
+					if ($7.expression_type == IMMEDIATE)
+					{
+						gen_addi_instruction(program, expr_reg, REG_0, $7.value);
+					}
+					else
+					{
+						gen_add_instruction(program, expr_reg, REG_0, $7.value, CG_DIRECT_ALL);
+					}
+					gen_beq_instruction(program, $1.code_label, 0);
+
+					// End label
+					assignLabel(program, $1.end_label);
+				}
 ;
 
 return_statement : RETURN

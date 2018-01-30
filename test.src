@@ -1,0 +1,16 @@
+int x = 4;
+int y = 2;
+
+eval
+{
+	x = x * y;
+} unless y < x;
+
+write(x);
+
+eval
+{
+	x = x - y;
+} unless y >= x;
+
+write(x);
