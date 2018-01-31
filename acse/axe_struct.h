@@ -114,6 +114,14 @@ typedef struct t_while_statement
                                     * that follows the while construct */
 } t_while_statement;
 
+typedef struct t_map_on_statement
+{
+	t_axe_label *l_cond;
+	t_axe_label *l_stmt;
+	t_axe_label *l_end;
+	int index;
+} t_map_on_statement;
+
 /* create a label */
 extern t_axe_label * alloc_label(int value);
 

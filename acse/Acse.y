@@ -106,6 +106,7 @@ t_io_infos *file_infos;    /* input and output files used by the compiler */
    t_list *list;
    t_axe_label *label;
    t_while_statement while_stmt;
+   t_map_on_statement map_on_stmt;
 } 
 /*=========================================================================
                                TOKENS 
@@ -122,6 +123,11 @@ t_io_infos *file_infos;    /* input and output files used by the compiler */
 %token RETURN
 %token READ
 %token WRITE
+
+%token <map_on_stmt> MAP
+%token ON
+%token AS
+
 
 %token <label> DO
 %token <while_stmt> WHILE
@@ -164,7 +170,7 @@ t_io_infos *file_infos;    /* input and output files used by the compiler */
       2. A list of instructions. (at least one instruction!).
  * When the rule associated with the non-terminal `program' is executed,
  * the parser notify it to the `program' singleton instance. */
-program: var_declarations statements
+program  : var_declarations statements
          {
             /* Notify the end of the program. Once called
              * the function `set_end_Program' - if necessary -
@@ -177,18 +183,18 @@ program: var_declarations statements
          }
 ;
 
-var_declarations: var_declarations var_declaration   { /* does nothing */ }
+var_declarations : var_declarations var_declaration   { /* does nothing */ }
                  | /* empty */                        { /* does nothing */ }
 ;
 
-var_declaration: TYPE declaration_list SEMI
+var_declaration   : TYPE declaration_list SEMI
                   {
                      /* update the program infos by adding new variables */
                      set_new_variables(program, $1, $2);
                   }
 ;
 
-declaration_list: declaration_list COMMA declaration
+declaration_list  : declaration_list COMMA declaration
                   {  /* add the new declaration to the list of declarations */
                      $$ = addElement($1, $3, -1);
                   }
@@ -199,7 +205,7 @@ declaration_list: declaration_list COMMA declaration
                   }
 ;
 
-declaration: IDENTIFIER ASSIGN NUMBER
+declaration : IDENTIFIER ASSIGN NUMBER
             {
                /* create a new instance of t_axe_declaration */
                $$ = alloc_declaration($1, 0, 0, $3);
@@ -230,34 +236,70 @@ declaration: IDENTIFIER ASSIGN NUMBER
 
 /* A block of code can be either a single statement or
  * a set of statements enclosed between braces */
-code_block: statement                  { /* does nothing */ }
+code_block  : statement                  { /* does nothing */ }
             | LBRACE statements RBRACE   { /* does nothing */ }
 ;
 
 /* One or more code statements */
-statements: statements statement       { /* does nothing */ }
+statements  : statements statement       { /* does nothing */ }
             | statement                  { /* does nothing */ }
 ;
 
 /* A statement can be either an assignment statement or a control statement
  * or a read/write statement or a semicolon */
-statement: assign_statement SEMI      { /* does nothing */ }
+statement   : assign_statement SEMI      { /* does nothing */ }
             | control_statement          { /* does nothing */ }
             | read_write_statement SEMI  { /* does nothing */ }
             | SEMI            { gen_nop_instruction(program); }
 ;
 
-control_statement: if_statement         { /* does nothing */ }
+control_statement : if_statement         { /* does nothing */ }
             | while_statement            { /* does nothing */ }
             | do_while_statement SEMI    { /* does nothing */ }
             | return_statement SEMI      { /* does nothing */ }
+            | map_on_as_statement {}
 ;
 
-read_write_statement: read_statement  { /* does nothing */ }
+map_on_as_statement : MAP IDENTIFIER ON IDENTIFIER
+						{
+							$1.l_end = newLabel(program);
+							
+							t_axe_variable *array_variable = getVariable(program, $4);
+							
+							if(!array_variable->isArray) notifyError(AXE_INVALID_TYPE);
+							
+							$1.index = getNewRegister(program);
+							gen_addi_instruction(program, $1.index, $1.index, array_variable->arraySize);
+							
+							// BEGIN LOOP
+							$1.l_cond = assignNewLabel(program);
+							gen_subi_instruction(program, $1.index, $1.index, 1);
+							gen_blt_instruction(program, $1.l_end, 0);
+							
+							int array_elem = loadArrayElement(program, $4, create_expression($1.index, REGISTER));
+							
+							int elem = get_symbol_location(program, $2, 0);
+							gen_add_instruction(program, elem, REG_0, array_elem, CG_DIRECT_ALL);						
+							// END LOOP
+							
+							$1.l_stmt = assignNewLabel(program);
+						}
+						AS LBRACE statements RBRACE
+						{
+							int elem = get_symbol_location(program, $2, 0);
+							storeArrayElement(program, $4, create_expression($1.index, REGISTER), create_expression(elem, REGISTER));
+							
+							gen_bt_instruction(program, $1.l_cond, 0);
+							assignLabel(program, $1.l_end);
+							free($2); free($4);
+						}
+;
+
+read_write_statement : read_statement  { /* does nothing */ }
                      | write_statement { /* does nothing */ }
 ;
 
-assign_statement: IDENTIFIER LSQUARE exp RSQUARE ASSIGN exp
+assign_statement : IDENTIFIER LSQUARE exp RSQUARE ASSIGN exp
             {
                /* Notify to `program' that the value $6
                 * have to be assigned to the location
@@ -306,7 +348,7 @@ assign_statement: IDENTIFIER LSQUARE exp RSQUARE ASSIGN exp
             }
 ;
             
-if_statement: if_stmt
+if_statement   : if_stmt
                {
                   /* fix the `label_else' */
                   assignLabel(program, $1);
@@ -330,7 +372,7 @@ if_statement: if_stmt
                }
 ;
             
-if_stmt:  IF
+if_stmt  :  IF
                {
                   /* the label that points to the address where to jump if
                    * `exp' is not verified */
@@ -350,7 +392,7 @@ if_stmt:  IF
                code_block { $$ = $1; }
 ;
 
-while_statement: WHILE
+while_statement  : WHILE
                   {
                      /* initialize the value of the non-terminal */
                      $1 = create_while_statement();
@@ -386,7 +428,7 @@ while_statement: WHILE
                   }
 ;
                   
-do_while_statement: DO
+do_while_statement  : DO
                      {
                         /* the label that points to the address where to jump if
                          * `exp' is not verified */
@@ -408,14 +450,14 @@ do_while_statement: DO
                      }
 ;
 
-return_statement: RETURN
+return_statement : RETURN
             {
                /* insert an HALT instruction */
                gen_halt_instruction(program);
             }
 ;
 
-read_statement: READ LPAR IDENTIFIER RPAR 
+read_statement : READ LPAR IDENTIFIER RPAR 
             {
                int location;
                
@@ -435,7 +477,7 @@ read_statement: READ LPAR IDENTIFIER RPAR
             }
 ;
             
-write_statement: WRITE LPAR exp RPAR 
+write_statement : WRITE LPAR exp RPAR 
             {
    
                int location;
