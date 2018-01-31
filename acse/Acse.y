@@ -106,6 +106,7 @@ t_io_infos *file_infos;    /* input and output files used by the compiler */
    t_list *list;
    t_axe_label *label;
    t_while_statement while_stmt;
+   t_reduce_statement reduce_stmt;
 } 
 /*=========================================================================
                                TOKENS 
@@ -122,6 +123,9 @@ t_io_infos *file_infos;    /* input and output files used by the compiler */
 %token RETURN
 %token READ
 %token WRITE
+
+%token <reduce_stmt> REDUCE
+%token INTO AS ON
 
 %token <label> DO
 %token <while_stmt> WHILE
@@ -251,6 +255,51 @@ control_statement: if_statement         { /* does nothing */ }
             | while_statement            { /* does nothing */ }
             | do_while_statement SEMI    { /* does nothing */ }
             | return_statement SEMI      { /* does nothing */ }
+            | reduce_statement SEMI {}
+;
+
+reduce_statement: REDUCE IDENTIFIER INTO IDENTIFIER AS
+				{
+					$1.l_start = newLabel(program);
+					gen_bt_instruction(program, $1.l_start, 0);
+					$1.l_exp = assignNewLabel(program);
+				}
+				LSQUARE LSQUARE exp RSQUARE RSQUARE
+				{
+					$1.l_continue = newLabel(program);
+					gen_bt_instruction(program, $1.l_continue, 0);
+				}
+				ON IDENTIFIER
+				{
+					$1.l_end = newLabel(program);
+					assignLabel(program, $1.l_start);
+					t_axe_variable *array_variable = getVariable(program, $14);
+					if(!array_variable->isArray) notifyError(AXE_INVALID_TYPE);
+					int index_reg = gen_load_immediate(program, array_variable->arraySize);
+					int elem_reg = get_symbol_location(program, $2, 0);
+					int result_reg = get_symbol_location(program, $4, 0);
+					
+					$1.l_loop = assignNewLabel(program);
+					// LOOP
+					gen_subi_instruction(program, index_reg, index_reg, 1);
+					gen_blt_instruction(program, $1.l_end, 0);
+					int i_reg = loadArrayElement(program, $14, create_expression(index_reg,REGISTER));
+					gen_add_instruction(program, elem_reg, REG_0, i_reg, CG_DIRECT_ALL);
+					// EVALUATE EXPRESSION
+					gen_bt_instruction(program, $1.l_exp, 0);
+					assignLabel(program, $1.l_continue);
+					// PUT EXPRESSION RESULT INTO result_reg
+					if($9.expression_type == IMMEDIATE){
+						result_reg = gen_load_immediate(program, $9.value);
+					}
+					else{
+						gen_add_instruction(program, result_reg, REG_0, $9.value, CG_DIRECT_ALL);
+					}
+					gen_bt_instruction(program, $1.l_loop, 0);				
+					
+					free($2); free($4); free($14);
+					assignLabel(program, $1.l_end);
+				}
 ;
 
 read_write_statement: read_statement  { /* does nothing */ }

@@ -1,0 +1,13 @@
+int vett[3];
+int elem;
+int result=0;
+
+vett[0] = 10;
+vett[1] = 5;
+vett[2] = 1;
+
+reduce elem into result
+as [[result+elem]]
+on vett;
+
+write(result);
