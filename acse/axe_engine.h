@@ -20,6 +20,7 @@ typedef struct t_program_infos
   t_list *variables;
   t_list *instructions;
   t_list *data;
+  t_list *conds;
   t_axe_label_manager *lmanager;
   t_symbol_table *sy_table;
   int current_register;
@@ -70,5 +71,14 @@ extern void finalizeProgramInfos(t_program_infos *program);
 
 /* write the corresponding assembly for the given program */
 extern void writeAssembly(t_program_infos *program, char *output_file);
+
+/* Push a cond statement to stack */
+extern void pushCondStatement(t_program_infos*, t_cond_statement*);
+
+/* Pop and return head of cond statements */
+extern t_cond_statement* popCondStatement(t_program_infos*);
+
+/* Get current cond statement */
+extern t_cond_statement* getCurrentCondStatement(t_program_infos*);
 
 #endif

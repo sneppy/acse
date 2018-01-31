@@ -122,9 +122,12 @@ t_io_infos *file_infos;    /* input and output files used by the compiler */
 %token RETURN
 %token READ
 %token WRITE
+%token COND
+%token DEFAULT
 
 %token <label> DO
 %token <while_stmt> WHILE
+%token <label> CASE
 %token <label> IF
 %token <label> ELSE
 %token <intval> TYPE
@@ -250,6 +253,7 @@ statement: assign_statement SEMI      { /* does nothing */ }
 control_statement: if_statement         { /* does nothing */ }
             | while_statement            { /* does nothing */ }
             | do_while_statement SEMI    { /* does nothing */ }
+			| cond_statement			 { /* does nothing */ }
             | return_statement SEMI      { /* does nothing */ }
 ;
 
@@ -406,6 +410,60 @@ do_while_statement: DO
                            /* if `exp' returns TRUE, jump to the label $1 */
                            gen_bne_instruction (program, $1, 0);
                      }
+;
+
+cond_statement:	COND
+				{
+					// Push this cond statement to stack
+					t_cond_statement *current = create_cond_statement();
+					current->label_end = newLabel(program);
+					pushCondStatement(program, current);
+				}
+				LBRACE cond_block RBRACE
+				{
+					// Pop cond statement and assing end label
+					t_cond_statement* current = popCondStatement(program);					
+					assignLabel(program, current->label_end);
+					_FREE_FUNCTION(current);
+				}
+;
+
+cond_block: cond_list default_statement	{ /* Nothing */ }
+		  | cond_list					{ /* Nothing */ }
+;
+
+cond_list: cond_list case_statement	{ /* Nothing */ }
+		 | case_statement			{ /* Nothing */ }
+;
+
+case_statement: CASE exp
+				{
+					// This label actually refers to the next case statement
+					$1 = newLabel(program);
+
+					// Check expression
+					int exp_reg = getNewRegister(program);
+					if ($2.expression_type == IMMEDIATE)
+					{
+						gen_addi_instruction(program, exp_reg, REG_0, $2.value);
+					}
+					else
+					{
+						gen_add_instruction(program, exp_reg, REG_0, $2.value, CG_DIRECT_ALL);
+					}
+					gen_beq_instruction(program, $1, 0);
+				}
+				COLON statements
+				{
+					// If statments are executed jump to the end of the cond statement
+					gen_bt_instruction(program, getCurrentCondStatement(program)->label_end, 0);
+
+					// Next statement right after this one
+					assignLabel(program, $1);
+				}
+;
+
+default_statement: DEFAULT COLON statements
 ;
 
 return_statement: RETURN

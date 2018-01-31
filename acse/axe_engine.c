@@ -477,6 +477,7 @@ t_program_infos * allocProgramInfos()
    /* initialize the new instance of `result' */
    result->variables = NULL;
    result->instructions = NULL;
+   result->conds = NULL;
    result->data = NULL;
    result->current_register = 1; /* we are excluding the register R0 */
    result->lmanager = initialize_label_manager();
@@ -901,4 +902,43 @@ void finalizeVariables(t_list *variables)
 
    /* free the list of variables */
    freeList(variables);
+}
+
+/* Push a cond statement to stack */
+void pushCondStatement(t_program_infos* program, t_cond_statement* cond_statement)
+{
+	if (program == NULL)
+	{
+		//free(cond_statement);
+		notifyError(AXE_PROGRAM_NOT_INITIALIZED);
+	}
+	
+	program->conds = addElement(program->conds, cond_statement, 0);
+
+	if (program->conds == NULL)
+	{
+		notifyError(AXE_OUT_OF_MEMORY);
+	}
+}
+
+/* Pop and return cond statement (remember to free element) */
+t_cond_statement* popCondStatement(t_program_infos* program)
+{
+	if (program == NULL || program->conds == NULL) return NULL;
+
+	t_list *head = program->conds;
+	t_list *next = LNEXT(head);
+	program->conds = next;
+	t_cond_statement *current = (t_cond_statement*)LDATA(head);
+	_FREE_FUNCTION(head);
+
+	return current;
+}
+
+/* Get current cond_statement */
+t_cond_statement* getCurrentCondStatement(t_program_infos* program)
+{
+	if (program == NULL || program->conds == NULL) return NULL;
+
+	return (t_cond_statement*)LDATA(program->conds);
 }

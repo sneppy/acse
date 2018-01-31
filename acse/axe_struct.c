@@ -100,6 +100,20 @@ t_while_statement create_while_statement()
    return statement;
 }
 
+/* create a cond statement */
+t_cond_statement* create_cond_statement()
+{
+	t_cond_statement *statement = (t_cond_statement*)_AXE_ALLOC_FUNCTION(sizeof(t_cond_statement));
+	if (statement)
+	{
+		statement->label_end = NULL;
+		return statement;
+	}
+
+	// Error
+	return NULL;
+}
+
 t_axe_label * alloc_label(int value)
 {
    t_axe_label *result;

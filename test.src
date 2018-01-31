@@ -1,0 +1,9 @@
+int x = 3;
+
+cond
+{
+	case x == 0: write(1);
+	case x == 2: write(4); write(2); write(1);
+	case x == 3: write(8); write(4); write(2); write(1);
+	default: write(0);
+}
