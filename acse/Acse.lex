@@ -85,6 +85,7 @@ ID       [a-zA-Z_][a-zA-Z0-9_]*
 "!="              { return NOTEQ; }
 "<="              { return LTEQ; }
 ">="              { return GTEQ; }
+"=a="			  { return EQ_ARRAY; }
 "&&"              { return ANDAND; }
 "||"              { return OROR; }
 ","               { return COMMA; }

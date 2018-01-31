@@ -115,7 +115,7 @@ t_io_infos *file_infos;    /* input and output files used by the compiler */
 %token LBRACE RBRACE LPAR RPAR LSQUARE RSQUARE
 %token SEMI COLON PLUS MINUS MUL_OP DIV_OP MOD_OP
 %token AND_OP OR_OP NOT_OP
-%token ASSIGN LT GT SHL_OP SHR_OP EQ NOTEQ LTEQ GTEQ
+%token ASSIGN LT GT SHL_OP SHR_OP EQ NOTEQ LTEQ GTEQ EQ_ARRAY
 %token ANDAND OROR
 %token COMMA
 %token FOR
@@ -146,7 +146,7 @@ t_io_infos *file_infos;    /* input and output files used by the compiler */
 %left ANDAND
 %left OR_OP
 %left AND_OP
-%left EQ NOTEQ
+%left EQ NOTEQ EQ_ARRAY
 %left LT GT LTEQ GTEQ
 %left SHL_OP SHR_OP
 %left MINUS PLUS
@@ -544,6 +544,46 @@ exp: NUMBER      { $$ = create_expression ($1, IMMEDIATE); }
    | exp GTEQ exp    {
                         $$ = handle_binary_comparison (program, $1, $3, _GTEQ_);
    }
+   | IDENTIFIER EQ_ARRAY IDENTIFIER
+     {
+		 t_axe_variable *v1 = getVariable(program, $1);
+		 t_axe_variable *v2 = getVariable(program, $3);
+
+		 $$ = create_expression(0, IMMEDIATE);
+
+		 if (v1 == NULL || v2 == NULL || !v1->isArray || !v2->isArray)
+		 {
+			 notifyError(AXE_SYNTAX_ERROR);
+		 }
+		 else if (v1->arraySize == v2->arraySize)
+		 {
+			 t_axe_label *label_loop = newLabel(program);
+			 t_axe_label *label_end = newLabel(program);
+			 t_axe_expression result;
+
+			 // i = arraySize - 1, decremented each iteration
+			 t_axe_expression i = create_expression(gen_load_immediate(program, v1->arraySize - 1), REGISTER);
+
+			 // Loop label
+			 assignLabel(program, label_loop);
+
+			 int e1 = loadArrayElement(program, $1, i);
+			 int e2 = loadArrayElement(program, $3, i);
+			 result = handle_binary_comparison(program, create_expression(e1, REGISTER), create_expression(e2, REGISTER), _EQ_);
+
+			 gen_sub_instruction(program, e1, e1, e2, CG_DIRECT_ALL);
+			 gen_bne_instruction(program, label_end, 0);
+
+			 // i--
+			 gen_subi_instruction(program, i.value, i.value, 1);
+			 gen_bge_instruction(program, label_loop, 0);
+
+			 // End label
+			 assignLabel(program, label_end);
+
+			 $$ = result;
+		 }
+	 }
    | exp SHL_OP exp  {  $$ = handle_bin_numeric_op(program, $1, $3, SHL); }
    | exp SHR_OP exp  {  $$ = handle_bin_numeric_op(program, $1, $3, SHR); }
    | exp ANDAND exp  {  $$ = handle_bin_numeric_op(program, $1, $3, ANDL); }
