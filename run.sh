@@ -4,6 +4,8 @@ FILENAME=${FILENAME%.*}
 
 printf "\n================ ACSE V1.1.0 ================\n"
 make
+rm $FILENAME".asm"
+rm $FILENAME".o"
 printf "\n==================== SCR ====================\n"
 bin/acse $1 $FILENAME".asm"
 printf "\n==================== ASM ====================\n"
