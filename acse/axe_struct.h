@@ -114,6 +114,13 @@ typedef struct t_while_statement
                                     * that follows the while construct */
 } t_while_statement;
 
+typedef struct t_sum_out
+{
+	t_axe_label *l_loop;
+	t_axe_label *l_end;
+	int result_reg;
+} t_sum_out;
+
 /* create a label */
 extern t_axe_label * alloc_label(int value);
 

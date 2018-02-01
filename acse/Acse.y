@@ -106,6 +106,7 @@ t_io_infos *file_infos;    /* input and output files used by the compiler */
    t_list *list;
    t_axe_label *label;
    t_while_statement while_stmt;
+   t_sum_out sum_out;
 } 
 /*=========================================================================
                                TOKENS 
@@ -122,6 +123,9 @@ t_io_infos *file_infos;    /* input and output files used by the compiler */
 %token RETURN
 %token READ
 %token WRITE
+
+%token <sum_out> SUM
+%token OUT OF AS
 
 %token <label> DO
 %token <while_stmt> WHILE
@@ -304,6 +308,43 @@ assign_statement: IDENTIFIER LSQUARE exp RSQUARE ASSIGN exp
                /* free the memory associated with the IDENTIFIER */
                free($1);
             }
+            | IDENTIFIER ASSIGN SUM
+			{
+		   		$3.result_reg = get_symbol_location(program, $1, 0);
+		   		gen_addi_instruction(program, $3.result_reg, REG_0, 0);
+			}
+			IDENTIFIER COMMA IDENTIFIER OUT OF IDENTIFIER
+			{    
+				$3.l_end = newLabel(program);
+				
+				t_axe_variable *array_var = getVariable(program, $10);
+				int var1 = get_symbol_location(program, $5, 0);
+				int var2 = get_symbol_location(program, $7, 0);
+				if(!array_var->isArray) notifyError(AXE_INVALID_TYPE);
+				int index_reg = gen_load_immediate(program, array_var->arraySize-1);
+			
+				$3.l_loop = assignNewLabel(program);
+				gen_subi_instruction(program, index_reg, index_reg, 1);
+				gen_blt_instruction(program, $3.l_end, 0);
+				t_axe_expression index_exp = create_expression(index_reg, REGISTER);
+				int elem1 = loadArrayElement(program, $10, index_exp);
+				gen_add_instruction(program, var1, REG_0, elem1, CG_DIRECT_ALL);
+				int elem2 = loadArrayElement(program, $10, handle_bin_numeric_op(program, index_exp, create_expression(1, IMMEDIATE), ADD));
+				gen_add_instruction(program, var2, REG_0, elem2, CG_DIRECT_ALL);
+			}
+			AS exp
+			{
+				if ($13.expression_type == IMMEDIATE) {
+					gen_addi_instruction(program, $3.result_reg, $3.result_reg, $13.value);
+				}
+				else {
+					gen_add_instruction(program, $3.result_reg, $3.result_reg, $13.value, CG_DIRECT_ALL);
+				}
+				
+				gen_bt_instruction(program, $3.l_loop, 0);
+			
+				assignLabel(program, $3.l_end);
+			}
 ;
             
 if_statement: if_stmt
