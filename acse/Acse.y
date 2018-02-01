@@ -90,6 +90,8 @@ t_reg_allocator *RA;       /* Register allocator. It implements the "Linear scan
 
 t_io_infos *file_infos;    /* input and output files used by the compiler */
 
+t_list *condStack;
+
 %}
 
 %expect 1
@@ -106,6 +108,7 @@ t_io_infos *file_infos;    /* input and output files used by the compiler */
    t_list *list;
    t_axe_label *label;
    t_while_statement while_stmt;
+   t_cond_statement *cond_stmt;
 } 
 /*=========================================================================
                                TOKENS 
@@ -122,6 +125,9 @@ t_io_infos *file_infos;    /* input and output files used by the compiler */
 %token RETURN
 %token READ
 %token WRITE
+
+%token CASE DEFAULT
+%token <cond_stmt> COND
 
 %token <label> DO
 %token <while_stmt> WHILE
@@ -251,6 +257,49 @@ control_statement: if_statement         { /* does nothing */ }
             | while_statement            { /* does nothing */ }
             | do_while_statement SEMI    { /* does nothing */ }
             | return_statement SEMI      { /* does nothing */ }
+            | cond_statement {}
+;
+
+cond_statement: COND
+				{
+					t_cond_statement *condStmt = malloc(sizeof(t_cond_statement));
+					condStmt->l_end = newLabel(program);
+					condStack = addFirst(condStack, condStmt);
+				}
+				LBRACE cond_block RBRACE
+				{
+					assignLabel(program, ((t_cond_statement*)LDATA(getElementAt(condStack,0)))->l_end);
+					condStack = removeFirst(condStack);
+				}
+;
+
+cond_block: cond_list
+			| cond_list default
+;
+
+cond_list: cond_list case
+			| case
+;
+
+case: CASE exp COLON
+	{
+		((t_cond_statement*)LDATA(getElementAt(condStack,0)))->l_next = newLabel(program);
+		
+		if($2.expression_type == IMMEDIATE)
+			gen_load_immediate(program, $2.value);
+		else
+			gen_andb_instruction(program, $2.value, $2.value, $2.value, CG_DIRECT_ALL);
+		
+		gen_beq_instruction(program, ((t_cond_statement*)LDATA(getElementAt(condStack,0)))->l_next, 0);
+	}
+	statements
+	{
+		gen_bt_instruction(program, ((t_cond_statement*)LDATA(getElementAt(condStack,0)))->l_end, 0);
+		assignLabel(program, ((t_cond_statement*)LDATA(getElementAt(condStack,0)))->l_next);
+	}
+;
+
+default: DEFAULT COLON statements
 ;
 
 read_write_statement: read_statement  { /* does nothing */ }
