@@ -460,6 +460,24 @@ t_axe_variable * getVariable
    return NULL;
 }
 
+/* Store a value in an existing variable */
+void storeVariable(t_program_infos* program, char* ID, t_axe_expression exp)
+{
+	t_axe_label *var = getLabelFromVariableID(program, ID);
+
+	if (var == NULL) notifyError(AXE_INVALID_VARIABLE);
+
+	if (exp.expression_type == IMMEDIATE)
+	{
+		int exp_reg = gen_load_immediate(program, exp.value);
+		gen_addi_instruction(program, var, REG_0, exp_reg, CG_INDIRECT_DEST);
+	}
+	else
+	{
+		gen_add_instruction(program, var, REG_0, exp.value, CG_INDIRECT_DEST);
+	}
+}
+
 /* initialize an instance of `t_program_infos' */
 t_program_infos * allocProgramInfos()
 {

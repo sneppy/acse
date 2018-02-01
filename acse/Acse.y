@@ -106,6 +106,7 @@ t_io_infos *file_infos;    /* input and output files used by the compiler */
    t_list *list;
    t_axe_label *label;
    t_while_statement while_stmt;
+   t_foreach_statement foreach_stmt;
 } 
 /*=========================================================================
                                TOKENS 
@@ -122,9 +123,12 @@ t_io_infos *file_infos;    /* input and output files used by the compiler */
 %token RETURN
 %token READ
 %token WRITE
+%token IN
+%token EVERY
 
 %token <label> DO
 %token <while_stmt> WHILE
+%token <foreach_stmt> FOREACH
 %token <label> IF
 %token <label> ELSE
 %token <intval> TYPE
@@ -250,6 +254,7 @@ statement: assign_statement SEMI      { /* does nothing */ }
 control_statement: if_statement         { /* does nothing */ }
             | while_statement            { /* does nothing */ }
             | do_while_statement SEMI    { /* does nothing */ }
+			| foreach_statement			 { /* does nothing */ }
             | return_statement SEMI      { /* does nothing */ }
 ;
 
@@ -406,6 +411,87 @@ do_while_statement: DO
                            /* if `exp' returns TRUE, jump to the label $1 */
                            gen_bne_instruction (program, $1, 0);
                      }
+;
+
+foreach_statement: FOREACH
+				   {
+					   $1 = create_foreach_statement();
+					   // Labels
+					   $1.label_loop			= newLabel(program);
+					   $1.label_foreach_block	= newLabel(program);
+					   $1.label_every_block		= newLabel(program);
+					   $1.label_end				= newLabel(program);
+					   // Counters
+					   $1.index	= create_expression(gen_load_immediate(program, 0), REGISTER);
+					   $1.every	= create_expression(gen_load_immediate(program, 0), REGISTER);
+				   }
+				   IDENTIFIER IN IDENTIFIER
+				   {
+					   t_axe_variable *elem	= getVariable(program, $3),
+					   				  *arr	= getVariable(program, $5);
+					   if (elem == NULL || arr == NULL)
+					   {
+						   notifyError(AXE_UNKNOWN_VARIABLE);
+					   }					   
+					   else if (elem->isArray || !arr->isArray)
+					   {
+						   notifyError(AXE_SYNTAX_ERROR);
+					   }
+					   else
+					   {
+						   // Loop block
+						   assignLabel(program, $1.label_loop);
+
+						   // Read element and store in variable
+						   int arr_reg = loadArrayElement(program, $5, $1.index);
+						   gen_store_instruction(program, arr_reg, elem->labelID, 0);
+
+						   // We must check every expression and then decide which block to execute
+						   // So we jump there and jump back if necessary
+						   gen_bt_instruction(program, $1.label_every_block, 0);
+
+						   // Foreach block
+						   assignLabel(program, $1.label_foreach_block);
+					   }
+				   }
+				   code_block
+				   {
+					   t_axe_variable *arr = getVariable(program, $5);
+					   int check_reg = getNewRegister(program);
+
+					   gen_addi_instruction(program, $1.index.value, $1.index.value, 1);
+					   gen_addi_instruction(program, $1.every.value, $1.every.value, 1);
+					   gen_subi_instruction(program, check_reg, $1.index.value, arr->arraySize);
+					   gen_bne_instruction(program, $1.label_loop, 0);
+					   
+					   gen_bt_instruction(program, $1.label_end, 0);
+				   }
+				   EVERY exp
+				   {
+					   if ($10.expression_type != IMMEDIATE) notifyError(AXE_SYNTAX_ERROR);
+
+					   // Every block
+					   assignLabel(program, $1.label_every_block);
+					   
+					   int check_reg = getNewRegister(program);
+					   gen_subi_instruction(program, check_reg, $1.every.value, $10.value);
+					   gen_bne_instruction(program, $1.label_foreach_block, 0);
+
+					   // Reset every counter
+					   gen_add_instruction(program, $1.every.value, REG_0, REG_0, CG_DIRECT_ALL);
+				   }
+				   code_block
+				   {
+					   t_axe_variable *arr = getVariable(program, $5);
+					   int check_reg = getNewRegister(program);
+
+					   gen_addi_instruction(program, $1.index.value, $1.index.value, 1);
+					   gen_subi_instruction(program, check_reg, $1.index.value, arr->arraySize);
+					   gen_bne_instruction(program, $1.label_loop, 0);
+
+					   // End
+					   assignLabel(program, $1.label_end);
+				   }
 ;
 
 return_statement: RETURN

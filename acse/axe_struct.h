@@ -114,6 +114,16 @@ typedef struct t_while_statement
                                     * that follows the while construct */
 } t_while_statement;
 
+typedef struct t_foreach_statement
+{
+	t_axe_expression index; // Index for the counter
+	t_axe_expression every; // Counter for every block
+	t_axe_label *label_loop; // Point to the start of the loop
+	t_axe_label *label_foreach_block; // Points to the foreach code block
+	t_axe_label *label_every_block; // Points to the every code block
+	t_axe_label *label_end; // Points to the end of the structure
+} t_foreach_statement;
+
 /* create a label */
 extern t_axe_label * alloc_label(int value);
 
@@ -122,6 +132,9 @@ extern t_axe_expression create_expression (int value, int type);
 
 /* create an instance that will mantain infos about a while statement */
 extern t_while_statement create_while_statement();
+
+/* create a new instance with labels already created */
+extern t_foreach_statement create_foreach_statement();
 
 /* create an instance of `t_axe_register' */
 extern t_axe_register * alloc_register(int ID, int indirect);

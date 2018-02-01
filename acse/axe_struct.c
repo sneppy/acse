@@ -100,6 +100,20 @@ t_while_statement create_while_statement()
    return statement;
 }
 
+/* create a new instance with labels already created */
+t_foreach_statement create_foreach_statement()
+{
+	t_foreach_statement statement;
+
+	// init
+	statement.label_loop			= NULL;
+	statement.label_foreach_block	= NULL;
+	statement.label_every_block		= NULL;
+	statement.label_end				= NULL;
+
+	return statement;
+}
+
 t_axe_label * alloc_label(int value)
 {
    t_axe_label *result;

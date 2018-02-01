@@ -56,6 +56,9 @@ extern void createVariable(t_program_infos *program
 extern t_axe_variable * getVariable
       (t_program_infos *program, char *ID);
 
+/* Store a value in an existing variable */
+extern void storeVariable(t_program_infos* program, char* ID, t_axe_expression exp);
+
 /* get the label that marks the starting address of the variable
  * with name "ID" */
 extern t_axe_label * getLabelFromVariableID
