@@ -106,6 +106,7 @@ t_io_infos *file_infos;    /* input and output files used by the compiler */
    t_list *list;
    t_axe_label *label;
    t_while_statement while_stmt;
+   t_foreach_statement foreach_stmt;
 } 
 /*=========================================================================
                                TOKENS 
@@ -122,6 +123,9 @@ t_io_infos *file_infos;    /* input and output files used by the compiler */
 %token RETURN
 %token READ
 %token WRITE
+
+%token EVERY IN DO
+%token <foreach_stmt> FOREACH
 
 %token <label> DO
 %token <while_stmt> WHILE
@@ -251,6 +255,58 @@ control_statement: if_statement         { /* does nothing */ }
             | while_statement            { /* does nothing */ }
             | do_while_statement SEMI    { /* does nothing */ }
             | return_statement SEMI      { /* does nothing */ }
+            | foreach_statement SEMI {}
+;
+
+foreach_statement: FOREACH IDENTIFIER IN IDENTIFIER
+					{
+						$1.elem_reg = get_symbol_location(program, $2, 0);
+						$1.array = getVariable(program, $4);
+						if(getVariable(program,$2)->isArray) exit(-1);
+						if(!$1.array->isArray) exit(-1);
+						$1.index_reg = gen_load_immediate(program, -1);
+						
+						$1.l_start = newLabel(program);
+						$1.l_init = newLabel(program);
+						gen_bt_instruction(program, $1.l_init, 0);
+						
+						$1.l_main = assignNewLabel(program);
+					}
+					LBRACE statements RBRACE
+					{
+						gen_bt_instruction(program, $1.l_start, 0);
+					}
+					EVERY exp DO
+					{
+						if($11.expression_type != IMMEDIATE) exit(-1);
+						if($11.value <= 1 || $11.value >= $1.array->arraySize ) exit(-1);
+						$1.l_end = newLabel(program);
+						
+						// INITIALIZATION
+						assignLabel(program, $1.l_init);
+						$1.every_reg = gen_load_immediate(program, $11.value);
+						
+						// START OF THE LOOP
+						assignLabel(program, $1.l_start);					
+						gen_addi_instruction(program, $1.index_reg, $1.index_reg, 1);
+						
+						int check = gen_load_immediate(program, $1.array->arraySize);
+						gen_sub_instruction(program, check, check, $1.index_reg, CG_DIRECT_ALL);
+						gen_beq_instruction(program, $1.l_end, 0);
+						
+						t_axe_expression index_expr = create_expression($1.index_reg, REGISTER);
+						int temp_reg = loadArrayElement(program, $4, index_expr);
+						gen_add_instruction(program, $1.elem_reg, REG_0, temp_reg, CG_DIRECT_ALL);
+						
+						gen_subi_instruction(program, $1.every_reg, $1.every_reg, 1);
+						gen_bne_instruction(program, $1.l_main, 0);
+					}
+					LBRACE statements RBRACE
+					{
+						$1.every_reg = gen_load_immediate(program, $11.value);
+						gen_bt_instruction(program, $1.l_start, 0);
+						assignLabel(program, $1.l_end);
+					}
 ;
 
 read_write_statement: read_statement  { /* does nothing */ }

@@ -99,6 +99,11 @@ ID       [a-zA-Z_][a-zA-Z0-9_]*
 "read"            { return READ; }
 "write"           { return WRITE; }
 
+"foreach" {return FOREACH;}
+"in" {return IN;}
+"every" {return EVERY;}
+"do" {return DO;}
+
 {ID}              { yylval.svalue=strdup(yytext); return IDENTIFIER; }
 {DIGIT}+          { yylval.intval = atoi( yytext );
                     return(NUMBER); }

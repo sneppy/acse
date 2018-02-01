@@ -1,0 +1,14 @@
+int elem, v[5], a;
+a=0;
+
+v[0] = 10;
+v[1] = 20;
+v[2] = 30;
+v[3] = 40;
+v[4] = 50;
+
+foreach elem in v {
+	write(1);
+} every 2 do {
+	write(2);
+};
