@@ -113,7 +113,7 @@ t_io_infos *file_infos;    /* input and output files used by the compiler */
 %start program
 
 %token LBRACE RBRACE LPAR RPAR LSQUARE RSQUARE
-%token SEMI COLON PLUS MINUS MUL_OP DIV_OP MOD_OP
+%token SEMI COLON PLUS MINUS MUL_OP SOFTMUL DIV_OP MOD_OP
 %token AND_OP OR_OP NOT_OP
 %token ASSIGN LT GT SHL_OP SHR_OP EQ NOTEQ LTEQ GTEQ
 %token ANDAND OROR
@@ -150,7 +150,7 @@ t_io_infos *file_infos;    /* input and output files used by the compiler */
 %left LT GT LTEQ GTEQ
 %left SHL_OP SHR_OP
 %left MINUS PLUS
-%left MUL_OP DIV_OP
+%left MUL_OP SOFTMUL DIV_OP
 %right NOT
 
 /*=========================================================================
@@ -468,6 +468,41 @@ exp: NUMBER      { $$ = create_expression ($1, IMMEDIATE); }
                      /* free the memory associated with the IDENTIFIER */
                      free($1);
    }
+   | exp SOFTMUL exp
+	{
+		t_axe_label *l_skip = newLabel(program);
+		t_axe_label *l_end = newLabel(program);
+		t_axe_label *l_fin = newLabel(program);
+		
+		if($1.expression_type == IMMEDIATE && $3.expression_type == IMMEDIATE) {
+			$$ = create_expression($1.value*$3.value, IMMEDIATE);
+		}
+		else {
+			int var1 = ($1.expression_type == IMMEDIATE) ? gen_load_immediate(program, $1.value) : $1.value;
+			int var2 = ($3.expression_type == IMMEDIATE) ? gen_load_immediate(program, $3.value) : $3.value;
+			int minus = gen_load_immediate(program, 0);
+			int result = gen_load_immediate(program, 0);
+			
+			gen_andb_instruction(program, var1, var1, var1, CG_DIRECT_ALL);
+			gen_bgt_instruction(program, l_skip, 0);
+			gen_addi_instruction(program, minus, REG_0, 1);
+			gen_sub_instruction(program, var1, REG_0, var1, CG_DIRECT_ALL);
+			assignLabel(program, l_skip);
+			
+			gen_andb_instruction(program, var1, var1, var1, CG_DIRECT_ALL);
+			gen_beq_instruction(program, l_end, 0);
+			gen_add_instruction(program, result, result, var2, CG_DIRECT_ALL);
+			gen_subi_instruction(program, var1, var1, 1);
+			gen_bt_instruction(program, l_skip, 0);
+			assignLabel(program, l_end);
+			
+			gen_andb_instruction(program, minus, minus, minus, CG_DIRECT_ALL);
+			gen_beq_instruction(program, l_fin, 0);
+			gen_sub_instruction(program, result, REG_0, result, CG_DIRECT_ALL);
+			assignLabel(program, l_fin);
+			$$ = create_expression(result, REGISTER);
+		}
+	}
    | IDENTIFIER LSQUARE exp RSQUARE {
                      int reg;
                      
