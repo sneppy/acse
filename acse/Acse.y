@@ -106,6 +106,7 @@ t_io_infos *file_infos;    /* input and output files used by the compiler */
    t_list *list;
    t_axe_label *label;
    t_while_statement while_stmt;
+   t_for_statement for_stmt;
 } 
 /*=========================================================================
                                TOKENS 
@@ -118,7 +119,7 @@ t_io_infos *file_infos;    /* input and output files used by the compiler */
 %token ASSIGN LT GT SHL_OP SHR_OP EQ NOTEQ LTEQ GTEQ
 %token ANDAND OROR
 %token COMMA
-%token FOR
+%token <for_stmt> FOR
 %token RETURN
 %token READ
 %token WRITE
@@ -251,6 +252,42 @@ control_statement: if_statement         { /* does nothing */ }
             | while_statement            { /* does nothing */ }
             | do_while_statement SEMI    { /* does nothing */ }
             | return_statement SEMI      { /* does nothing */ }
+            | for_statement {}
+;
+
+for_statement:	FOR
+				{
+					$1.l_end = newLabel(program);
+					$1.l_code = newLabel(program);
+				}
+				LPAR assign_list SEMI
+				{
+					$1.l_cond = assignNewLabel(program);
+				}
+				exp SEMI
+				{
+					if($7.expression_type == IMMEDIATE)
+						gen_load_immediate(program, $7.value);
+					else
+						gen_andb_instruction(program, $7.value, $7.value, $7.value, CG_DIRECT_ALL);
+					gen_beq_instruction(program, $1.l_end, 0);
+					gen_bt_instruction(program, $1.l_code, 0);
+					$1.l_update = assignNewLabel(program);
+				}
+				assign_list RPAR
+				{
+					gen_bt_instruction(program, $1.l_cond, 0);
+					assignLabel(program, $1.l_code);
+				}
+				code_block
+				{
+					gen_bt_instruction(program, $1.l_update, 0);
+					assignLabel(program, $1.l_end);
+				}
+;
+
+assign_list: assign_list assign_statement
+			| assign_statement
 ;
 
 read_write_statement: read_statement  { /* does nothing */ }
