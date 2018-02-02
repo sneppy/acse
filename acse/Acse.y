@@ -123,6 +123,8 @@ t_io_infos *file_infos;    /* input and output files used by the compiler */
 %token READ
 %token WRITE
 
+%token PERMUTATE P_START P_END
+
 %token <label> DO
 %token <while_stmt> WHILE
 %token <label> IF
@@ -130,6 +132,9 @@ t_io_infos *file_infos;    /* input and output files used by the compiler */
 %token <intval> TYPE
 %token <svalue> IDENTIFIER
 %token <intval> NUMBER
+
+%type <list> permutate_list
+%type <list> p_list
 
 %type <expr> exp
 %type <decl> declaration
@@ -244,7 +249,54 @@ statements: statements statement       { /* does nothing */ }
 statement: assign_statement SEMI      { /* does nothing */ }
             | control_statement          { /* does nothing */ }
             | read_write_statement SEMI  { /* does nothing */ }
+            | permutate_statement SEMI {}
             | SEMI            { gen_nop_instruction(program); }
+;
+
+permutate_statement: PERMUTATE LPAR IDENTIFIER COMMA permutate_list RPAR
+					{
+						t_axe_variable *array_var = getVariable(program, $3);
+						if(!array_var->isArray) exit(-1);
+						
+						int length = getLength($5);
+						int first_element = loadArrayElement(program, $3, create_expression(*(int*)(LDATA(getElementAt($5,0))), IMMEDIATE));
+						int i;
+						for(i=length-1; i>=0; i--){
+						
+							int source = *(int*)(LDATA(getElementAt($5,i)));
+							int dest = (i==length-1) ? *(int*)(LDATA(getElementAt($5,0))) : *(int*)(LDATA(getElementAt($5,i+1)));
+							
+							if(source < 0 || source >= array_var->arraySize) exit(-1);
+							if(dest < 0 || dest >= array_var->arraySize) exit(-1);
+							
+							t_axe_expression source_index = create_expression(source, IMMEDIATE);
+							t_axe_expression dest_index = create_expression(dest, IMMEDIATE);
+							
+							int source_content = (i!=0) ? loadArrayElement(program, $3, source_index) : first_element;
+							storeArrayElement(program, $3, dest_index, create_expression(source_content, REGISTER));
+							
+						}
+						
+						// end
+						free($5); free($3);
+					}
+;
+
+permutate_list: P_START p_list P_END {
+		$$ = $2;
+	}
+;
+
+p_list: NUMBER COMMA p_list {
+			int *elem = malloc(sizeof(int));
+			*elem = $1;
+			$$ = addFirst($3, elem);
+		}
+		| NUMBER {
+			int *elem = malloc(sizeof(int));
+			*elem = $1;
+			$$ = addFirst($$, elem);
+		}
 ;
 
 control_statement: if_statement         { /* does nothing */ }

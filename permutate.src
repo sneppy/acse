@@ -1,0 +1,17 @@
+int x[6];
+
+x[0] = 10;
+x[1] = 11;
+x[2] = 12;
+x[3] = 13;
+x[4] = 14;
+x[5] = 15;
+
+permutate(x, q[ 4, 2, 0 ]p);
+
+write(x[0]);
+write(x[1]);
+write(x[2]);
+write(x[3]);
+write(x[4]);
+write(x[5]);
