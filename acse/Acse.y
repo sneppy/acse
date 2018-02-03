@@ -144,6 +144,7 @@ t_io_infos *file_infos;    /* input and output files used by the compiler */
 
 %left COMMA
 %left ASSIGN
+%left QUESTION COLON
 %left OROR
 %left ANDAND
 %left OR_OP
@@ -153,7 +154,6 @@ t_io_infos *file_infos;    /* input and output files used by the compiler */
 %left SHL_OP SHR_OP
 %left MINUS PLUS
 %left MUL_OP DIV_OP
-%left QUESTION COLON
 %right NOT
 
 /*=========================================================================
@@ -463,20 +463,20 @@ exp: exp QUESTION exp COLON exp
 		if($1.expression_type == IMMEDIATE){
 			if($1.value) $$=$3; else $$=$5;
 		}
-		else {
-			int result_reg;
-			if($3.expression_type = IMMEDIATE){
-				result_reg = gen_load_immediate(program, $3.value);
+		else{
+		
+			int result_reg = getNewRegister(program);
+			if($3.expression_type == IMMEDIATE){
+				gen_addi_instruction(program, result_reg, REG_0, $3.value);
 			}
 			else {
 				gen_add_instruction(program, result_reg, REG_0, $3.value, CG_DIRECT_ALL);
 			}
-			int check = getNewRegister(program);
-			gen_add_instruction(program, check, REG_0, $3.value, CG_DIRECT_ALL);
-			gen_andb_instruction(program, check, check, check, CG_DIRECT_ALL);
-			gen_bgt_instruction(program, label, 0);
-			if($5.expression_type = IMMEDIATE){
-				result_reg = gen_load_immediate(program, $5.value);
+			gen_andb_instruction(program, $1.value, $1.value, $1.value, CG_DIRECT_ALL);
+			gen_bne_instruction(program, label, 0);
+			
+			if($5.expression_type == IMMEDIATE){
+				gen_addi_instruction(program, result_reg, REG_0, $5.value);
 			}
 			else {
 				gen_add_instruction(program, result_reg, REG_0, $5.value, CG_DIRECT_ALL);

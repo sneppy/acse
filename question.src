@@ -1,8 +1,9 @@
 int x;
-int a = 1;
-int b = 20;
+int a;
+int b;
 
-a = 0;
+a = 100;
+b = 200;
 
-x = (a ? 1 : 2);
+x = a!=b ? a+a : b+b;
 write(x);
