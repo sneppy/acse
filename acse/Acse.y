@@ -106,6 +106,7 @@ t_io_infos *file_infos;    /* input and output files used by the compiler */
    t_list *list;
    t_axe_label *label;
    t_while_statement while_stmt;
+   t_for_statement for_stmt;
 } 
 /*=========================================================================
                                TOKENS 
@@ -118,10 +119,12 @@ t_io_infos *file_infos;    /* input and output files used by the compiler */
 %token ASSIGN LT GT SHL_OP SHR_OP EQ NOTEQ LTEQ GTEQ
 %token ANDAND OROR
 %token COMMA
-%token FOR
 %token RETURN
 %token READ
 %token WRITE
+
+%token <for_stmt> FOR
+%token WHERE IN
 
 %token <label> DO
 %token <while_stmt> WHILE
@@ -135,6 +138,7 @@ t_io_infos *file_infos;    /* input and output files used by the compiler */
 %type <decl> declaration
 %type <list> declaration_list
 %type <label> if_stmt
+%type <expr> where_clause
 
 /*=========================================================================
                           OPERATOR PRECEDENCES
@@ -251,7 +255,59 @@ control_statement: if_statement         { /* does nothing */ }
             | while_statement            { /* does nothing */ }
             | do_while_statement SEMI    { /* does nothing */ }
             | return_statement SEMI      { /* does nothing */ }
+            | for_statement {}
 ;
+
+for_statement: FOR LPAR IDENTIFIER IN IDENTIFIER
+			{
+				t_axe_variable *elem_var = getVariable(program, $3);
+				t_axe_variable *array_var = getVariable(program, $5);
+				if(elem_var->isArray || !array_var->isArray) notifyError(AXE_INVALID_VARIABLE);
+				$1.index_reg = gen_load_immediate(program, -1);
+				$1.skip_reg = gen_load_immediate(program, 0);
+				
+				$1.l_code = newLabel(program);
+				$1.l_end = newLabel(program);
+				$1.l_init = assignNewLabel(program);
+				gen_addi_instruction(program, $1.index_reg, $1.index_reg, 1);
+				t_axe_expression check = handle_bin_numeric_op(program, create_expression(array_var->arraySize, IMMEDIATE),
+																create_expression($1.index_reg, REGISTER), SUB);
+				gen_andb_instruction(program, check.value, check.value, check.value, CG_DIRECT_ALL);
+				gen_beq_instruction(program, $1.l_end, 0);
+				int elem_reg = get_symbol_location(program, $3, 0);
+				int arrayelem_reg = loadArrayElement(program, $5, create_expression($1.index_reg, REGISTER));
+				gen_andb_instruction(program, elem_reg, arrayelem_reg, arrayelem_reg, CG_DIRECT_ALL);
+				
+				gen_andb_instruction(program, $1.skip_reg, $1.skip_reg, $1.skip_reg, CG_DIRECT_ALL);
+				gen_bne_instruction(program, $1.l_code, 0);
+				
+			}
+			where_clause RPAR
+			{				
+				if($7.expression_type == IMMEDIATE){
+					if($7.value) gen_addi_instruction(program, $1.skip_reg, REG_0, 1);
+					else gen_bt_instruction(program, $1.l_end, 0);
+				}
+				else{
+					gen_andb_instruction(program, $7.value, $7.value, $7.value, CG_DIRECT_ALL);
+					gen_beq_instruction(program, $1.l_init, 0);
+				}
+				
+				assignLabel(program, $1.l_code);
+			}
+			LBRACE statements RBRACE
+			{
+				gen_bt_instruction(program, $1.l_init, 0);
+				assignLabel(program, $1.l_end);
+			}
+;
+
+where_clause: WHERE exp {
+				$$ = $2;
+			}
+			| {
+				$$ = create_expression(1, IMMEDIATE);
+			}
 
 read_write_statement: read_statement  { /* does nothing */ }
                      | write_statement { /* does nothing */ }
