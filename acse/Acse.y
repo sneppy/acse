@@ -123,6 +123,8 @@ t_io_infos *file_infos;    /* input and output files used by the compiler */
 %token READ
 %token WRITE
 
+%token MEAN
+
 %token <label> DO
 %token <while_stmt> WHILE
 %token <label> IF
@@ -468,6 +470,19 @@ exp: NUMBER      { $$ = create_expression ($1, IMMEDIATE); }
                      /* free the memory associated with the IDENTIFIER */
                      free($1);
    }
+	| MEAN LPAR IDENTIFIER RPAR {
+		t_axe_variable *array = getVariable(program, $3);
+		if(!array->isArray) notifyError(AXE_INVALID_VARIABLE);
+		int result_reg = gen_load_immediate(program, 0);
+		int i;
+		for(i=0; i<array->arraySize; i++){
+			t_axe_expression index_expr = create_expression(i, IMMEDIATE);
+			int elem_reg = loadArrayElement(program, $3, index_expr);
+			gen_add_instruction(program, result_reg, result_reg, elem_reg, CG_DIRECT_ALL);
+		}
+		gen_divi_instruction(program, result_reg, result_reg, array->arraySize);
+		$$ = create_expression(result_reg, REGISTER);
+	}
    | IDENTIFIER LSQUARE exp RSQUARE {
                      int reg;
                      
