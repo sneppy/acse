@@ -90,6 +90,8 @@ t_reg_allocator *RA;       /* Register allocator. It implements the "Linear scan
 
 t_io_infos *file_infos;    /* input and output files used by the compiler */
 
+t_list *protectStack;
+
 %}
 
 %expect 1
@@ -122,6 +124,8 @@ t_io_infos *file_infos;    /* input and output files used by the compiler */
 %token RETURN
 %token READ
 %token WRITE
+
+%token PROTECT WITH
 
 %token <label> DO
 %token <while_stmt> WHILE
@@ -251,6 +255,37 @@ control_statement: if_statement         { /* does nothing */ }
             | while_statement            { /* does nothing */ }
             | do_while_statement SEMI    { /* does nothing */ }
             | return_statement SEMI      { /* does nothing */ }
+            | protect_with_statement {}
+;
+
+protect_with_statement: PROTECT
+						{
+							t_protect_statement *protect = malloc(sizeof(t_protect_statement));
+							protect->l_with = newLabel(program);
+							protect->l_end = newLabel(program);
+							protect->protection = 1;
+							protectStack = addFirst(protectStack, protect);
+						}
+						LBRACE statements RBRACE
+						{
+							gen_bt_instruction(program, ((t_protect_statement*)LDATA(getElementAt(protectStack,0)))->l_end, 0);
+							assignLabel(program, ((t_protect_statement*)LDATA(getElementAt(protectStack,0)))->l_with);
+						}
+						with_clause
+						{
+							assignLabel(program, ((t_protect_statement*)LDATA(getElementAt(protectStack,0)))->l_end);
+							protectStack = removeFirst(protectStack);
+						}
+;
+
+with_clause: WITH {
+				if(getElementAt(protectStack,1)!=NULL)
+				((t_protect_statement*)LDATA(getElementAt(protectStack,0)))->l_with =
+					((t_protect_statement*)LDATA(getElementAt(protectStack,1)))->l_with;
+				else ((t_protect_statement*)LDATA(getElementAt(protectStack,0)))->protection=0;
+			}
+			LBRACE statements RBRACE
+			| {gen_halt_instruction(program);}
 ;
 
 read_write_statement: read_statement  { /* does nothing */ }
@@ -523,9 +558,20 @@ exp: NUMBER      { $$ = create_expression ($1, IMMEDIATE); }
    | exp MUL_OP exp     {
                            $$ = handle_bin_numeric_op(program, $1, $3, MUL);
    }
-   | exp DIV_OP exp     {
-                           $$ = handle_bin_numeric_op(program, $1, $3, DIV);
-   }
+   
+   | exp DIV_OP exp 	{
+   							if(getElementAt(protectStack,0) != NULL) {
+	   							if( ((t_protect_statement*)LDATA(getElementAt(protectStack, 0)))->protection ){
+									if($3.expression_type == IMMEDIATE)
+										gen_load_immediate(program, $3.value);
+									else
+										gen_andb_instruction(program, $3.value, $3.value, $3.value, CG_DIRECT_ALL);
+									gen_beq_instruction(program, ((t_protect_statement*)LDATA(getElementAt(protectStack, 0)))->l_with, 0);
+								}
+							}
+							$$ = handle_bin_numeric_op(program, $1, $3, DIV);
+   						}
+   						
    | exp LT exp      {
                         $$ = handle_binary_comparison (program, $1, $3, _LT_);
    }

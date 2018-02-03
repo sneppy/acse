@@ -1,0 +1,23 @@
+int a, b;
+
+a = 10;
+b = 5;
+
+protect{
+
+	protect{
+		a = b/(b-b);
+		write(1);
+	} with {
+		a = b/0;
+	}
+	
+} with {
+	write(5);
+}
+
+protect {
+	a = 5/(b/b-1);
+} with {
+	write(7);
+}
