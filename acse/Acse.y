@@ -151,6 +151,7 @@ t_io_infos *file_infos;    /* input and output files used by the compiler */
 %left SHL_OP SHR_OP
 %left MINUS PLUS
 %left MUL_OP DIV_OP
+%left NOT_OP
 %right NOT
 
 /*=========================================================================
@@ -468,6 +469,42 @@ exp: NUMBER      { $$ = create_expression ($1, IMMEDIATE); }
                      /* free the memory associated with the IDENTIFIER */
                      free($1);
    }
+	| exp NOT_OP {
+		t_axe_label *l_end = newLabel(program);
+		t_axe_label *l_loop = newLabel(program);
+		int reg = gen_load_immediate(program, 0);
+		int result = gen_load_immediate(program, 0);
+		if($1.expression_type == IMMEDIATE)
+			gen_addi_instruction(program, reg, REG_0, $1.value);
+		else
+			gen_add_instruction(program, reg, reg, $1.value, CG_DIRECT_ALL);
+		gen_ble_instruction(program, l_end, 0);
+		gen_addi_instruction(program, result, REG_0, 1);
+		
+		assignLabel(program, l_loop);
+		gen_mul_instruction(program, result, result, reg, CG_DIRECT_ALL);
+		gen_subi_instruction(program, reg, reg, 1);
+		gen_bgt_instruction(program, l_loop, 0);
+		
+		assignLabel(program, l_end);
+		$$ = create_expression(result, REGISTER);
+	}
+	| OR_OP exp OR_OP %prec NOT_OP {
+		if($2.expression_type == IMMEDIATE) {
+			$$ = create_expression(0, IMMEDIATE);
+			if($2.value < 0) $$.value = -$2.value;
+			else $$.value = $2.value;
+		}
+		else {
+			t_axe_label *l_end = newLabel(program);
+			int reg = gen_load_immediate(program, 0);
+			gen_add_instruction(program, reg, reg, $2.value, CG_DIRECT_ALL);
+			gen_bgt_instruction(program, l_end, 0);
+			gen_muli_instruction(program, reg, reg, -1);
+			assignLabel(program, l_end);
+			$$ = create_expression(reg, REGISTER);
+		}
+	}
    | IDENTIFIER LSQUARE exp RSQUARE {
                      int reg;
                      
