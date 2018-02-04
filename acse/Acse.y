@@ -106,6 +106,7 @@ t_io_infos *file_infos;    /* input and output files used by the compiler */
    t_list *list;
    t_axe_label *label;
    t_while_statement while_stmt;
+   t_either_statement either_stmt;
 } 
 /*=========================================================================
                                TOKENS 
@@ -122,6 +123,11 @@ t_io_infos *file_infos;    /* input and output files used by the compiler */
 %token RETURN
 %token READ
 %token WRITE
+
+%token <either_stmt> EITHER
+%token OR
+%token ON
+%token UNTIL
 
 %token <label> DO
 %token <while_stmt> WHILE
@@ -251,6 +257,49 @@ control_statement: if_statement         { /* does nothing */ }
             | while_statement            { /* does nothing */ }
             | do_while_statement SEMI    { /* does nothing */ }
             | return_statement SEMI      { /* does nothing */ }
+            | either_statement SEMI {}
+;
+
+either_statement :	EITHER
+					{
+						$1.l_end = newLabel(program);
+						$1.l_init = newLabel(program);
+						gen_bt_instruction(program, $1.l_init, 0);
+						$1.l_either = assignNewLabel(program);
+					}
+					LBRACE statements RBRACE
+					{
+						gen_bt_instruction(program, $1.l_end, 0);
+						$1.l_or = assignNewLabel(program);
+					}
+					OR LBRACE statements RBRACE
+					{
+						gen_bt_instruction(program, $1.l_end, 0);
+						assignLabel(program, $1.l_init);
+					}
+					ON exp
+					{
+						if ($13.expression_type == IMMEDIATE) {
+							gen_load_immediate(program, $13.value);
+						}
+						else {
+							gen_andb_instruction(program, $13.value, $13.value, $13.value, CG_DIRECT_ALL);
+						}
+						gen_bne_instruction(program, $1.l_either, 0);
+						gen_bt_instruction(program, $1.l_or, 0);
+						assignLabel(program, $1.l_end);
+					}
+					UNTIL exp
+					{
+						if ($16.expression_type == IMMEDIATE) {
+							gen_load_immediate(program, $16.value);
+						}
+						else {
+							gen_andb_instruction(program, $16.value, $16.value, $16.value, CG_DIRECT_ALL);
+						}
+						gen_bne_instruction(program, $1.l_init, 0);
+					}
+
 ;
 
 read_write_statement: read_statement  { /* does nothing */ }

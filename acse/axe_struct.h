@@ -114,6 +114,11 @@ typedef struct t_while_statement
                                     * that follows the while construct */
 } t_while_statement;
 
+typedef struct t_either_statement
+{
+	t_axe_label *l_init, *l_either, *l_or, *l_end;
+} t_either_statement;
+
 /* create a label */
 extern t_axe_label * alloc_label(int value);
 
