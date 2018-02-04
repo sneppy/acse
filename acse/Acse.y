@@ -90,6 +90,8 @@ t_reg_allocator *RA;       /* Register allocator. It implements the "Linear scan
 
 t_io_infos *file_infos;    /* input and output files used by the compiler */
 
+t_list *chooseStack;
+
 %}
 
 %expect 1
@@ -122,6 +124,8 @@ t_io_infos *file_infos;    /* input and output files used by the compiler */
 %token RETURN
 %token READ
 %token WRITE
+
+%token CHOOSE
 
 %token <label> DO
 %token <while_stmt> WHILE
@@ -251,6 +255,51 @@ control_statement: if_statement         { /* does nothing */ }
             | while_statement            { /* does nothing */ }
             | do_while_statement SEMI    { /* does nothing */ }
             | return_statement SEMI      { /* does nothing */ }
+            | choose_statement {}
+;
+
+choose_statement: CHOOSE LPAR exp RPAR
+				{
+					t_choose_statement *chooseStmt = malloc(sizeof(t_choose_statement));
+					chooseStmt->target_reg = ($3.expression_type == IMMEDIATE) ? gen_load_immediate(program, $3.value) : $3.value;
+					chooseStmt->l_end = newLabel(program);
+					chooseStack = addFirst(chooseStack, chooseStmt);
+				}
+				LBRACE choose_list RBRACE
+				{
+					assignLabel(program, ((t_choose_statement*)LDATA(getElementAt(chooseStack,0)))->l_end);
+					chooseStack = removeFirst(chooseStack);
+				}
+;
+
+choose_list: choose_list COMMA {
+				int index_reg = ((t_choose_statement*)LDATA(getElementAt(chooseStack,0)))->index_reg;
+				gen_addi_instruction(program, index_reg, index_reg, 1);
+				int target_reg = ((t_choose_statement*)LDATA(getElementAt(chooseStack,0)))->target_reg;
+				
+				int temp = gen_load_immediate(program, 0);
+				gen_sub_instruction(program, temp, target_reg, index_reg, CG_DIRECT_ALL);
+				
+				((t_choose_statement*)LDATA(getElementAt(chooseStack,0)))->l_next = newLabel(program);
+				gen_bne_instruction(program, ((t_choose_statement*)LDATA(getElementAt(chooseStack,0)))->l_next, 0);
+			} LBRACE statements RBRACE {
+				gen_bt_instruction(program, ((t_choose_statement*)LDATA(getElementAt(chooseStack,0)))->l_end, 0);
+				assignLabel(program, ((t_choose_statement*)LDATA(getElementAt(chooseStack,0)))->l_next);
+			}
+			| {
+				int index_reg = gen_load_immediate(program, 0);
+				((t_choose_statement*)LDATA(getElementAt(chooseStack,0)))->index_reg = index_reg;
+				int target_reg = ((t_choose_statement*)LDATA(getElementAt(chooseStack,0)))->target_reg;
+				
+				int temp = gen_load_immediate(program, 0);
+				gen_sub_instruction(program, temp, target_reg, index_reg, CG_DIRECT_ALL);
+				
+				((t_choose_statement*)LDATA(getElementAt(chooseStack,0)))->l_next = newLabel(program);
+				gen_bne_instruction(program, ((t_choose_statement*)LDATA(getElementAt(chooseStack,0)))->l_next, 0);
+			} LBRACE statements RBRACE {
+				gen_bt_instruction(program, ((t_choose_statement*)LDATA(getElementAt(chooseStack,0)))->l_end, 0);
+				assignLabel(program, ((t_choose_statement*)LDATA(getElementAt(chooseStack,0)))->l_next);
+			}
 ;
 
 read_write_statement: read_statement  { /* does nothing */ }

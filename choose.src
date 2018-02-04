@@ -1,0 +1,17 @@
+int a, b;
+
+read(a);
+read(b);
+
+choose(a){
+	{write(10);},
+	{	
+		write(11);
+		choose(b){
+			{write(20);},
+			{write(21);},
+			{write(22);}
+		}
+	},
+	{write(12);}
+}
