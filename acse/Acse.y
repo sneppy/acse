@@ -90,6 +90,8 @@ t_reg_allocator *RA;       /* Register allocator. It implements the "Linear scan
 
 t_io_infos *file_infos;    /* input and output files used by the compiler */
 
+t_list *continueStack;
+
 %}
 
 %expect 1
@@ -122,6 +124,8 @@ t_io_infos *file_infos;    /* input and output files used by the compiler */
 %token RETURN
 %token READ
 %token WRITE
+
+%token CONTINUE
 
 %token <label> DO
 %token <while_stmt> WHILE
@@ -244,7 +248,13 @@ statements: statements statement       { /* does nothing */ }
 statement: assign_statement SEMI      { /* does nothing */ }
             | control_statement          { /* does nothing */ }
             | read_write_statement SEMI  { /* does nothing */ }
+            | continue_statement SEMI {}
             | SEMI            { gen_nop_instruction(program); }
+;
+
+continue_statement: CONTINUE {
+						gen_bt_instruction(program, ((t_axe_label*)LDATA(getElementAt(continueStack,0))), 0);
+					}
 ;
 
 control_statement: if_statement         { /* does nothing */ }
@@ -358,6 +368,8 @@ while_statement: WHILE
                      /* reserve and fix a new label */
                      $1.label_condition
                            = assignNewLabel(program);
+                     
+                     continueStack = addFirst(continueStack, $1.label_condition);
                   }
                   LPAR exp RPAR
                   {
@@ -383,6 +395,7 @@ while_statement: WHILE
 
                      /* fix the label `label_end' */
                      assignLabel(program, $1.label_end);
+                     continueStack = removeFirst(continueStack);
                   }
 ;
                   
@@ -394,17 +407,24 @@ do_while_statement: DO
                         
                         /* fix the label */
                         assignLabel(program, $1);
+                        
+                        continueStack = addFirst(continueStack, newLabel(program));
                      }
-                     code_block WHILE LPAR exp RPAR
+                     code_block
                      {
-                           if ($6.expression_type == IMMEDIATE)
-                               gen_load_immediate(program, $6.value);
+                     	assignLabel(program, ((t_axe_label*)LDATA(getElementAt(continueStack, 0))) );
+                     }
+                     WHILE LPAR exp RPAR
+                     {
+                           if ($7.expression_type == IMMEDIATE)
+                               gen_load_immediate(program, $7.value);
                            else
-                               gen_andb_instruction(program, $6.value,
-                                   $6.value, $6.value, CG_DIRECT_ALL);
+                               gen_andb_instruction(program, $7.value,
+                                   $7.value, $7.value, CG_DIRECT_ALL);
 
                            /* if `exp' returns TRUE, jump to the label $1 */
                            gen_bne_instruction (program, $1, 0);
+                           continueStack = removeFirst(continueStack);
                      }
 ;
 
