@@ -89,6 +89,9 @@ ID       [a-zA-Z_][a-zA-Z0-9_]*
 "||"              { return OROR; }
 ","               { return COMMA; }
 
+"$>>$" {return SHRR;}
+"$<<$" {return SHLR;}
+
 "do"              { return DO; }
 "else"            { return ELSE; }
 "for"             { return FOR; }

@@ -115,7 +115,7 @@ t_io_infos *file_infos;    /* input and output files used by the compiler */
 %token LBRACE RBRACE LPAR RPAR LSQUARE RSQUARE
 %token SEMI COLON PLUS MINUS MUL_OP DIV_OP MOD_OP
 %token AND_OP OR_OP NOT_OP
-%token ASSIGN LT GT SHL_OP SHR_OP EQ NOTEQ LTEQ GTEQ
+%token ASSIGN LT GT SHL_OP SHR_OP SHLR SHRR EQ NOTEQ LTEQ GTEQ
 %token ANDAND OROR
 %token COMMA
 %token FOR
@@ -148,7 +148,7 @@ t_io_infos *file_infos;    /* input and output files used by the compiler */
 %left AND_OP
 %left EQ NOTEQ
 %left LT GT LTEQ GTEQ
-%left SHL_OP SHR_OP
+%left SHL_OP SHR_OP SHLR SHRR
 %left MINUS PLUS
 %left MUL_OP DIV_OP
 %right NOT
@@ -508,6 +508,18 @@ exp: NUMBER      { $$ = create_expression ($1, IMMEDIATE); }
                            /* free the memory associated with the IDENTIFIER */
                            free($2);
    }
+	| exp SHLR exp {
+		t_axe_expression result_expr = handle_bin_numeric_op(program, $1, $3, SHL);
+		t_axe_expression mask_expr = handle_bin_numeric_op(program, $1, handle_bin_numeric_op(program, create_expression(32, IMMEDIATE), $3, SUB), SHR);
+		result_expr = handle_bin_numeric_op(program, result_expr, mask_expr, ORB);
+		$$ = result_expr;		
+	}
+	| exp SHRR exp {
+		t_axe_expression result_expr = handle_bin_numeric_op(program, $1, $3, SHR);
+		t_axe_expression mask_expr = handle_bin_numeric_op(program, $1, handle_bin_numeric_op(program, create_expression(32, IMMEDIATE), $3, SUB), SHL);
+		result_expr = handle_bin_numeric_op(program, result_expr, mask_expr, ORB);
+		$$ = result_expr;
+	}
    | exp AND_OP exp     {
                            $$ = handle_bin_numeric_op(program, $1, $3, ANDB);
    }
