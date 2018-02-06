@@ -16,6 +16,8 @@
 #include "axe_reg_alloc.h"
 #include "axe_io_manager.h"
 #include "axe_errors.h"
+#include "axe_expressions.h"
+#include "axe_array.h"
 
 extern int errorcode;
 extern int line_num;
@@ -271,4 +273,36 @@ void init_compiler(int argc, char **argv)
    line_num = 1;
 
    checkConsistency();
+}
+
+void rotate_array_right(t_program_infos* program, char* ID)
+{
+	t_axe_variable *arr = getVariable(program, ID);
+	t_axe_expression index = create_expression(gen_load_immediate(program, 1), REGISTER);
+	t_axe_expression size = create_expression(arr->arraySize, IMMEDIATE);
+	t_axe_expression index_0 = create_expression(0, IMMEDIATE);
+	t_axe_label *l_loop, *l_end;
+	int reg_i, reg_j;
+	l_loop = newLabel(program);
+	l_end = newLabel(program);
+
+	assignLabel(program, l_loop);
+	handle_binary_comparison(program, index, size, _EQ_);
+	gen_bne_instruction(program, l_end, 0);
+
+	reg_i = loadArrayElement(program, ID, index_0);
+	reg_j = loadArrayElement(program, ID, index);
+	
+	storeArrayElement(program, ID, index, create_expression(reg_i, REGISTER));
+	storeArrayElement(program, ID, index_0, create_expression(reg_j, REGISTER));
+
+	gen_addi_instruction(program, index.value, index.value, 1);
+	gen_bt_instruction(program, l_loop, 0);
+
+	assignLabel(program, l_end);
+}
+
+void rotate_array_left(t_program_infos* program, char* ID)
+{
+	
 }

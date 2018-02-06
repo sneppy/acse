@@ -243,8 +243,76 @@ statements: statements statement       { /* does nothing */ }
  * or a read/write statement or a semicolon */
 statement: assign_statement SEMI      { /* does nothing */ }
             | control_statement          { /* does nothing */ }
+			| array_shift_statement SEMI { /* does nothing */ }
             | read_write_statement SEMI  { /* does nothing */ }
             | SEMI            { gen_nop_instruction(program); }
+;
+
+array_shift_statement: IDENTIFIER SHR_OP exp
+					   {
+						   t_axe_variable *arr = getVariable(program, $1);
+						   if (arr == NULL || !arr->isArray) notifyError(AXE_SYNTAX_ERROR);
+
+						   if ($3.expression_type == IMMEDIATE)
+						   {
+							   for (int i = 0; i < $3.value; i++)
+							   {
+								   rotate_array_right(program, $1);
+							   }
+						   }
+						   else
+						   {
+							   t_axe_expression counter = create_expression(gen_load_immediate(program, 0), REGISTER);
+							   t_axe_label *l_loop, *l_end;
+							   l_loop = newLabel(program);
+							   l_end = newLabel(program);
+							   
+							   assignLabel(program, l_loop);
+
+							   handle_binary_comparison(program, counter, $3, _EQ_);
+							   gen_bne_instruction(program, l_end, 0);
+							   rotate_array_right(program, $1);
+
+							   gen_addi_instruction(program, counter.value, counter.value, 1);
+							   gen_bt_instruction(program, l_loop, 0);
+
+							   assignLabel(program, l_end);
+						   }
+					   }
+					 | IDENTIFIER SHL_OP exp
+					   {
+						   t_axe_variable *arr = getVariable(program, $1);
+						   if (arr == NULL || !arr->isArray) notifyError(AXE_SYNTAX_ERROR);
+
+						   if ($3.expression_type == IMMEDIATE)
+						   {
+							   // Use rotate right size - n times
+							   int iter = arr->arraySize - $3.value;
+							   for (int i = 0; i < iter; i++)
+							   {
+								   rotate_array_right(program, $1);
+							   }
+						   }
+						   else
+						   {
+							   t_axe_expression counter = create_expression(gen_load_immediate(program, 0), REGISTER);
+							   t_axe_expression iter = handle_bin_numeric_op(program, create_expression(arr->arraySize, IMMEDIATE), $3, SUB);
+							   t_axe_label *l_loop, *l_end;
+							   l_loop = newLabel(program);
+							   l_end = newLabel(program);
+							   
+							   assignLabel(program, l_loop);
+
+							   handle_binary_comparison(program, counter, iter, _EQ_);
+							   gen_bne_instruction(program, l_end, 0);
+							   rotate_array_right(program, $1);
+
+							   gen_addi_instruction(program, counter.value, counter.value, 1);
+							   gen_bt_instruction(program, l_loop, 0);
+
+							   assignLabel(program, l_end);
+						   }
+					   }
 ;
 
 control_statement: if_statement         { /* does nothing */ }

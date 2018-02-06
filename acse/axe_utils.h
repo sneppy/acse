@@ -58,4 +58,8 @@ extern void shutdownCompiler();
  * and should NEVER be called from the user code */
 extern void init_compiler(int argc, char **argv);
 
+extern void swapArrayElements(t_program_infos*, char*, t_axe_expression, t_axe_expression);
+extern void rotate_array_right(t_program_infos*, char*);
+extern void rotate_array_left(t_program_infos*, char*);
+
 #endif
