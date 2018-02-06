@@ -123,6 +123,9 @@ t_io_infos *file_infos;    /* input and output files used by the compiler */
 %token READ
 %token WRITE
 
+%token SHIP
+%token IN
+
 %token <label> DO
 %token <while_stmt> WHILE
 %token <label> IF
@@ -148,6 +151,7 @@ t_io_infos *file_infos;    /* input and output files used by the compiler */
 %left AND_OP
 %left EQ NOTEQ
 %left LT GT LTEQ GTEQ
+%left SHIP IN COLON
 %left SHL_OP SHR_OP
 %left MINUS PLUS
 %left MUL_OP DIV_OP
@@ -455,6 +459,77 @@ write_statement: WRITE LPAR exp RPAR
 ;
 
 exp: NUMBER      { $$ = create_expression ($1, IMMEDIATE); }
+	| exp SHIP exp {
+		if($1.expression_type == IMMEDIATE && $3.expression_type == IMMEDIATE){
+			int result = 0;
+			if($1.value < $3.value) result = -1;
+			if($1.value > $3.value) result = 1;
+			$$ = create_expression(result , IMMEDIATE);
+		}
+		else {
+			int reg1 = ($1.expression_type == IMMEDIATE) ? gen_load_immediate(program, $1.value) : $1.value;
+			int reg2 = ($3.expression_type == IMMEDIATE) ? gen_load_immediate(program, $3.value) : $3.value;
+			
+			t_axe_label *l_lt = newLabel(program);
+			t_axe_label *l_gt = newLabel(program);
+			t_axe_label *l_end = newLabel(program);
+			
+			int result_reg = gen_load_immediate(program, 0);
+			int temp_reg = getNewRegister(program);
+			gen_sub_instruction(program, temp_reg, reg1, reg2, CG_DIRECT_ALL);
+			gen_bgt_instruction(program, l_gt, 0);
+			gen_blt_instruction(program, l_lt, 0);
+			gen_bt_instruction(program, l_end, 0);
+			
+			assignLabel(program, l_gt);
+			gen_addi_instruction(program, result_reg, REG_0, 1);
+			gen_bt_instruction(program, l_end, 0);
+			
+			assignLabel(program, l_lt);
+			gen_addi_instruction(program, result_reg, REG_0, -1);
+			gen_bt_instruction(program, l_end, 0);
+			
+			assignLabel(program, l_end);
+			$$ = create_expression(result_reg, REGISTER);
+		}
+	}
+	| exp IN exp COLON exp %prec IN {
+		if($1.expression_type == IMMEDIATE &&
+				$3.expression_type == IMMEDIATE &&
+				$5.expression_type == IMMEDIATE){
+			$$ = create_expression( ($1.value>=$3.value) && ($1.value<=$5.value), IMMEDIATE );
+		}
+		else {
+			int regA = ($1.expression_type == IMMEDIATE) ? gen_load_immediate(program, $1.value) : $1.value;
+			int regB = ($3.expression_type == IMMEDIATE) ? gen_load_immediate(program, $3.value) : $3.value;
+			int regC = ($5.expression_type == IMMEDIATE) ? gen_load_immediate(program, $5.value) : $5.value;
+			
+			//a<b -> end 0
+			//a>c -> end 0
+			
+			t_axe_label *l_0 = newLabel(program);
+			t_axe_label *l_end = newLabel(program);
+			
+			int temp_reg = getNewRegister(program);
+			int result_reg = getNewRegister(program);
+			
+			gen_sub_instruction(program, temp_reg, regB, regA, CG_DIRECT_ALL);
+			gen_bgt_instruction(program, l_0, 0);
+			
+			gen_sub_instruction(program, temp_reg, regA, regC, CG_DIRECT_ALL);
+			gen_bgt_instruction(program, l_0, 0);
+			
+			gen_addi_instruction(program, result_reg, REG_0, 1);
+			gen_bt_instruction(program, l_end, 0);
+			
+			assignLabel(program, l_0);
+			gen_addi_instruction(program, result_reg, REG_0, 0);
+			
+			assignLabel(program, l_end);
+			$$ = create_expression(result_reg, REGISTER);			
+			
+		}
+	}	
    | IDENTIFIER  {
                      int location;
    

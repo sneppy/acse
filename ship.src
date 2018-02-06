@@ -1,0 +1,19 @@
+int a = 10;
+int b = 20;
+int c = 30;
+int x;
+
+x = a <=> b;
+write(x); // -1
+
+x = c <=> b;
+write(x); // 1
+
+x = a <=> b <=> (10 <=> 20);
+write(x); // -1 <=> -1  ->  0
+
+x = b in a:c;
+write(x); // 1
+
+x = 5 in 0 : 10 in 0 : 20;
+write(x);
